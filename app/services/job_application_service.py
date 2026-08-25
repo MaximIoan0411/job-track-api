@@ -17,6 +17,8 @@ from app.schemas.job_application import JobApplicationCreate, JobApplicationUpda
 from app.schemas.pagination import CursorPage
 from app.utils import decode_cursor, encode_cursor
 
+from app.enums import ApplicationStatus, AuditAction
+
 MAX_PAGE_SIZE = 100
 
 
@@ -143,6 +145,44 @@ async def update_application(
             application_id=application.id,
             action=AuditAction.UPDATED,
             changes=changes,
+        )
+    )
+
+    try:
+        await db.commit()
+    except StaleDataError:
+        await db.rollback()
+        raise VersionConflictError(
+            "Aplicarea a fost modificată între timp. Reîncarcă și încearcă din nou."
+        )
+
+    await db.refresh(application)
+    return application
+
+async def change_status(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    application_id: uuid.UUID,
+    new_status: ApplicationStatus,
+) -> JobApplication:
+    application = await _get_owned_application(db, application_id, user_id)
+
+    if application.deleted_at is not None:
+        raise InvalidStateError(
+            "Nu poți schimba statusul unei aplicări șterse. Restaureaz-o mai întâi."
+        )
+
+    if application.status == new_status:
+        return application
+
+    old_status = application.status
+    application.status = new_status
+
+    db.add(
+        AuditLog(
+            application_id=application.id,
+            action=AuditAction.STATUS_CHANGED,
+            changes={"status": {"old": old_status.value, "new": new_status.value}},
         )
     )
 

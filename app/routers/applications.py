@@ -11,6 +11,7 @@ from app.schemas.job_application import (
     JobApplicationCreate,
     JobApplicationRead,
     JobApplicationUpdate,
+    JobApplicationStatusUpdate,
 )
 from app.schemas.pagination import CursorPage
 from app.services import job_application_service as service
@@ -58,6 +59,16 @@ async def update_application(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     return await service.update_application(db, current_user.id, application_id, data)
+
+@router.patch("/{application_id}/status", response_model=JobApplicationRead)
+async def change_application_status(
+    application_id: uuid.UUID,
+    data: JobApplicationStatusUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return await service.change_status(db, current_user.id, application_id, data.status)
+
 
 
 @router.delete("/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
