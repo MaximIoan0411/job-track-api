@@ -15,6 +15,7 @@ from app.schemas.job_application import (
 )
 from app.schemas.pagination import CursorPage
 from app.services import job_application_service as service
+from app.schemas.audit_log import AuditLogRead
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -101,3 +102,12 @@ async def restore_application(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     return await service.restore_application(db, current_user.id, application_id)
+
+
+@router.get("/{application_id}/history", response_model=list[AuditLogRead])
+async def get_application_history(
+    application_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return await service.get_application_history(db, current_user.id, application_id)

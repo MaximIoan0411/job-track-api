@@ -297,3 +297,16 @@ async def search_applications(
         next_cursor = encode_cursor(last.created_at, last.id)
 
     return CursorPage(items=items, next_cursor=next_cursor, has_more=has_more)
+
+
+async def get_application_history(
+    db: AsyncSession, user_id: uuid.UUID, application_id: uuid.UUID
+) -> list[AuditLog]:
+    application = await _get_owned_application(db, application_id, user_id)
+
+    result = await db.execute(
+        select(AuditLog)
+        .where(AuditLog.application_id == application.id)
+        .order_by(AuditLog.created_at.desc())
+    )
+    return list(result.scalars().all())
