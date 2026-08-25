@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.job_application import JobApplication
+    from app.models.refresh_token import RefreshToken
 
 
 class User(Base):
@@ -28,6 +29,12 @@ class User(Base):
     )
 
     applications: Mapped[list["JobApplication"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
