@@ -41,6 +41,19 @@ async def list_applications(
         db, current_user.id, status_filter, include_deleted, cursor, limit
     )
 
+@router.get("/search", response_model=CursorPage[JobApplicationRead])
+async def search_applications(
+    q: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    include_deleted: bool = False,
+    cursor: str | None = None,
+    limit: int = 20,
+):
+    return await service.search_applications(
+        db, current_user.id, q, include_deleted, cursor, limit
+    )
+
 
 @router.get("/{application_id}", response_model=JobApplicationRead)
 async def get_application(

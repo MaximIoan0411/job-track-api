@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Any
 
-from sqlalchemy import select, tuple_
+from sqlalchemy import select, tuple_ , func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
@@ -251,3 +251,49 @@ async def restore_application(
 
     await db.refresh(application)
     return application
+
+
+
+async def search_applications(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    query: str,
+    include_deleted: bool,
+    cursor: str | None,
+    limit: int,
+) -> CursorPage:
+    limit = min(max(limit, 1), MAX_PAGE_SIZE)
+
+    ts_query = func.plainto_tsquery("english", query)
+
+    stmt = select(JobApplication).where(
+        JobApplication.user_id == user_id,
+        JobApplication.search_vector.op("@@")(ts_query),
+    )
+
+    if not include_deleted:
+        stmt = stmt.where(JobApplication.deleted_at.is_(None))
+
+    if cursor:
+        cursor_created_at, cursor_id = decode_cursor(cursor)
+        stmt = stmt.where(
+            tuple_(JobApplication.created_at, JobApplication.id)
+            < (cursor_created_at, cursor_id)
+        )
+
+    stmt = stmt.order_by(
+        JobApplication.created_at.desc(), JobApplication.id.desc()
+    ).limit(limit + 1)
+
+    result = await db.execute(stmt)
+    rows = list(result.scalars().all())
+
+    has_more = len(rows) > limit
+    items = rows[:limit]
+
+    next_cursor = None
+    if has_more and items:
+        last = items[-1]
+        next_cursor = encode_cursor(last.created_at, last.id)
+
+    return CursorPage(items=items, next_cursor=next_cursor, has_more=has_more)
