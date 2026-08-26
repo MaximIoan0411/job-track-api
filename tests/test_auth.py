@@ -1,6 +1,4 @@
 
-
-
 async def test_register_success(client):
     response = await client.post(
         "/auth/register",
